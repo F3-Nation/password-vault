@@ -109,11 +109,11 @@ gcloud run services update f3-passwords \
   --update-env-vars="SIGNUPS_ALLOWED=false"
 
 ```
-5. **Enable org level logging**
+5. **Enable org level logging, suppress onboarding messaging**
 ```bash
 gcloud run services update f3-passwords \
   --region=us-central1 \
-  --update-env-vars="ORG_EVENTS_ENABLED=true,EVENTS_DAYS_RETAIN=190"
+  --update-env-vars="ORG_EVENTS_ENABLED=true,EVENTS_DAYS_RETAIN=190,CLIENT_SUPPRESS_ONBOARDING=true"
 ```
 
 
