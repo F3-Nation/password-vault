@@ -8,12 +8,12 @@ This guide explains **why** Nation provides this resource, **how** regional Coll
 
 ## TLDR
 
-1. The Nation is hosting an instance of Bitwarden and offering it as a free service for regions to use.
-1. In order to ensure that passwords are not lost when region leadership changes hands, the password vault is structured in a way that the Nation will have access to any passwords you store in it.
-1. There is no technical mechanism to prevent Nation admins from seeing passwords stored by Regions.
-1. All Nation admins commit to not using Region passwords.
-1. Everyone to access the password vault will need to set up a master password. This should not be shared. Others in your region don't need your master password to access credentials.
-1. A single pax can access passwords from multiple regions if they have the necessary permissions.
+1. The Nation is hosting an instance of Bitwarden and offering it as a free service for regions to optionally use.
+2. In order to ensure that passwords are not lost when region leadership changes hands, the password vault is structured in a way that the Nation will have access to any passwords you store in it.
+3. There is no technical mechanism to prevent Nation admins from seeing passwords stored by Regions.
+4. All Nation admins commit to not using Region passwords.
+5. In order to access the password vault will need to set up a master password. This should not be shared. Others in your region don't need your master password to access credentials.
+6. A single pax can access passwords from multiple regions if they have the necessary permissions.
 
 ---
 
@@ -21,7 +21,7 @@ This guide explains **why** Nation provides this resource, **how** regional Coll
 
 In F3, **leadership is fluid**. Roles like Nant'an, Weaselshaker, ITQ, Commz Q, and Site Qs constantly rotate as men step up or roll off.
 
-Historically, regional tech—such as website domains, email, social media accounts, and Slack workspace owner credentials—has been passed around via text messages, personal emails, physical notes, or region-owned password vault accounts. This creates serious risks for the region:
+Historically, regional tech—such as website domains, email, social media accounts, and Slack workspace owner credentials—have been passed around via text messages, personal emails, physical notes, or region-owned password vault accounts. This creates serious risks for the region:
 
 * **Orphaned Accounts:** A pax set up an account then moves or rolls off or goes dark, and the region loses access.
 * **Security Exposure:** Sending passwords over unencrypted channels (Slack/SMS) leaves regional tools vulnerable to account takeovers.
@@ -36,8 +36,8 @@ By hosting this centrally, **F3 Nation handles the server, backups, and security
 F3 Nation owns the vault infrastructure and manages top-level access via Organization settings and emergency keys:
 
 * **Regional Collections:** F3 Nation provisions a dedicated **Collection** for your Region.
-* **Guaranteed Access:** Personal vault storage is disabled system-wide. Every password created in this vault **must** be assigned to a Collection. This ensures that even if a pax rolls off unexpectedly or leaves without sharing credentials, the Region maintain uninterrupted access to regional assets.
-* **Easy Leadership Handoffs:** When a man steps up in your region, a Regional Admin simply assigns his account to that role's Collection. When he rolls off, access is removed in one click.
+* **Guaranteed Access:** Personal vault storage is disabled system-wide. Every password created in this vault **must** be assigned to a Collection. This ensures that even if a pax rolls off unexpectedly or leaves without sharing credentials, the Region maintains uninterrupted access to regional assets.
+* **Easy Leadership Handoffs:** When a man steps up in your region, a Regional Admin simply gives his account access to the collection by adding the `password manager` role in F3 Nation Admin interface. When he rolls off, the Regional Admin removes that role from account to prevent further access to the regions credentials.
 
 ---
 
@@ -54,20 +54,27 @@ Our vault uses **zero-knowledge encryption**:
 
 While Nation secures the infrastructure and guarantees data retention, local security depends on your individual habits:
 
-### 1. Write Down Your Master Password
+### 1. Use a Secure Master Password
+
+If somebody can guess your master password they will get access to all of your regions credentials.
+
+### 2. Write Down Your Master Password
 
 Because of zero-knowledge encryption, **there is NO "Forgot Password" link.**
 
 * If you forget your Master Password, your account will have to be deleted and recreated. No passwords will be lost.
 * **Action Required:** Write your Master Password down on paper when you set up your account and keep it somewhere safe at home.
 
-### 2. All Items Belong to Collections
+### 3. All Items Belong to Collections
 
 Because personal vaults are removed, any new credential you save will automatically prompt you to select your Region's Collection.
 
-### 3. Keep Personal & F3 Separate
+
+### 4. Keep Personal & F3 Separate
 
 Do not attempt to store personal banking, personal emails, or private household passwords in this vault. It is strictly dedicated to **F3 operations**.
+
+Please do NOT use mobile apps or browser extensions with this service as they will attempt to add personal credentials to the vault.
 
 ---
 
