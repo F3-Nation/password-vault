@@ -137,3 +137,114 @@ gcloud run deploy f3-passwords \
 Application settings (such as SMTP mail settings, login options, and org policies) can be adjusted in real time by visiting the Web Admin interface at `https://<YOUR-CLOUD-RUN-URL>/admin`. Changes made there persist inside the GCS bucket under `/data/config.json`.
 
 
+Here is the documentation section for setting up and authenticating the Bitwarden CLI (`bw`) with your Vaultwarden instance. You can drop this directly into your project's `README.md`.
+
+---
+
+```markdown
+## Bitwarden CLI Setup (`bw`)
+
+The automated Python toolkit relies on the Bitwarden CLI (`bw`) to perform client-side AES-256 encryption before sending payloads to Vaultwarden. This ensures collection names and regional assets display properly in the Web Vault without decryption errors.
+
+---
+
+### 1. Installation
+
+Install the Bitwarden CLI binary on your machine or container environment:
+
+* **macOS (Homebrew):**
+  ```bash
+  brew install bitwarden-cli
+
+```
+
+* **Linux / Cloud Run Container (npm):**
+```bash
+npm install -g @bitwarden/cli
+
+```
+
+
+* **Direct Binary Download (Linux x64):**
+```bash
+curl -LO "[https://vault.bitwarden.com/download/?app=cli&platform=linux](https://vault.bitwarden.com/download/?app=cli&platform=linux)"
+unzip "index.html?app=cli&platform=linux" -d /usr/local/bin/
+chmod +x /usr/local/bin/bw
+
+```
+
+
+
+---
+
+### 2. Configure Vaultwarden Host
+
+Point the CLI to your self-hosted Vaultwarden server URL:
+
+```bash
+bw config server https://passwords.f3nation.com
+
+```
+
+---
+
+### 3. Authentication & Session Export
+
+To run the provisioning scripts, the CLI requires an active authenticated session token (`BW_SESSION`).
+
+#### Method A: Interactive Master Password Login (Recommended for Local Dev)
+
+1. Log in to your Vaultwarden account:
+```bash
+bw login user@f3nation.com
+
+```
+
+
+2. Unlock your vault and export the session key to your environment:
+```bash
+export BW_SESSION=$(bw unlock --raw)
+
+```
+
+
+
+#### Method B: API Key Login (Recommended for Cloud Run / CI Pipelines)
+
+1. Set your personal API credentials (retrieved from Web Vault $\rightarrow$ **Account Settings** $\rightarrow$ **API Access**):
+```bash
+export BW_CLIENTID="user.xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+export BW_CLIENTSECRET="your_user_api_secret"
+
+```
+
+
+2. Authenticate and obtain the raw session token:
+```bash
+bw login --apikey
+export BW_SESSION=$(bw unlock --raw)
+
+```
+
+
+
+---
+
+### 4. Verification
+
+Verify that your CLI session is active and linked to the organization:
+
+```bash
+# Verify session state
+bw status
+
+# Verify Organization ID visibility
+bw get template org-collection
+
+```
+
+If `bw status` outputs `"status": "unlocked"`, you are ready to execute the provisioning scripts.
+
+```
+
+```
