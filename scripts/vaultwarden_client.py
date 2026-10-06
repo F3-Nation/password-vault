@@ -67,34 +67,3 @@ class VaultwardenClient:
             f"Collection ID: {data.get('id')} | External ID: {postgres_id}"
         )
         return data
-
-    def invite_members(
-        self, collection_id: str, emails: list[str], read_only: bool = False, role_type: int = 2
-    ) -> None:
-        """Invites members to the organization with access to a specific collection."""
-        raw_template = self._run_cmd(["bw", "get", "template", "org-member"])
-
-        for email in emails:
-            template = json.loads(raw_template)
-            template["organizationId"] = self.org_id
-            template["emails"] = [email]
-            template["type"] = role_type  # 2 = Standard User (Member)
-            template["accessAll"] = False
-            template["collections"] = [
-                {
-                    "id": collection_id,
-                    "readOnly": read_only,
-                    "hidePasswords": False,
-                }
-            ]
-            # Clear out groups placeholder if present in template
-            if "groups" in template:
-                template["groups"] = []
-
-            payload_json = json.dumps(template)
-            encoded_data = self._run_cmd(["bw", "encode"], input_data=payload_json)
-
-            self._run_cmd(
-                ["bw", "create", "org-member", encoded_data, "--organizationid", self.org_id]
-            )
-            logger.info(f"Invited '{email}' to collection ID '{collection_id}'.")

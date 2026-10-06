@@ -6,6 +6,10 @@ This guide explains **why** Nation provides this resource, **how** regional Coll
 
 ---
 
+## Disclaimer for the Disclaimer
+
+This is not a legally binding agreement. This is informational to ensure users understand the use of the application.
+
 ## TLDR
 
 1. The Nation is hosting an instance of Bitwarden and offering it as a free service for regions to optionally use.
