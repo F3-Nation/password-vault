@@ -1,91 +1,74 @@
 # F3 Password Vault: Disclaimer for Regions
 
-Welcome to the **F3 Nation Password Vault**! Managed centrally by **F3 Nation IT**, this secure vault powered by **Vaultwarden** (an open-source implementation of Bitwarden) is provided to help **Regions** safely store, share, and pass down digital assets.
+F3 Nation IT runs a shared password vault (powered by **Vaultwarden**, an open-source version of Bitwarden) so **Regions** can safely store and hand off their digital accounts.
 
-This guide explains **why** Nation provides this resource, **how** regional Collections work, and **your responsibilities** as a PAX or Q managing regional tech.
-
----
-
-## Disclaimer for the Disclaimer
-
-This is not a legally binding agreement. This is informational to ensure users understand the use of the application.
-
-## TLDR
-
-1. The Nation is hosting an instance of Bitwarden and offering it as a free service for regions to optionally use.
-2. In order to ensure that passwords are not lost when region leadership changes hands, the password vault is structured in a way that the Nation will have access to any passwords you store in it.
-3. There is no technical mechanism to prevent Nation admins from seeing passwords stored by Regions.
-4. All Nation admins commit to not using Region passwords.
-5. In order to access the password vault will need to set up a master password. This should not be shared. Others in your region don't need your master password to access credentials.
-6. A single pax can access passwords from multiple regions if they have the necessary permissions.
+This is not a legal agreement. It just explains how the vault works and what you need to do.
 
 ---
 
-## Why F3 Nation Provides This
+## The Short Version
 
-In F3, **leadership is fluid**. Roles like Nant'an, Weaselshaker, ITQ, Commz Q, and Site Qs constantly rotate as men step up or roll off.
-
-Historically, regional tech—such as website domains, email, social media accounts, and Slack workspace owner credentials—have been passed around via text messages, personal emails, physical notes, or region-owned password vault accounts. This creates serious risks for the region:
-
-* **Orphaned Accounts:** A pax set up an account then moves or rolls off or goes dark, and the region loses access.
-* **Security Exposure:** Sending passwords over unencrypted channels (Slack/SMS) leaves regional tools vulnerable to account takeovers.
-* **Handoff Friction:** New pax waste weeks trying to track down credentials instead of focusing on their role.
-
-By hosting this centrally, **F3 Nation handles the server, backups, and security infrastructure**, while giving each Region a secure container that belongs permanently to the region—not to any single guy's personal email.
+1. The Nation hosts this vault and offers it free for regions to use.
+2. The vault is set up so passwords aren't lost when region leaders change. The implication of that is that the Nation can access anything you store here.
+3. Nothing technically stops Nation admins or Area/Territory/Sector admins from seeing region passwords.
+4. All Nation admins promise not to use region passwords.
+5. On initial login, you'll set a **master password**. Keep it private. Others in your region don't need it to get the credentials you share. They will have their own account with their own master password if they need access.
+6. One pax can access multiple regions' passwords if they're given permission.
 
 ---
 
-## How It Works: Infrastructure & Regional Collections
+## Why the Nation Provides This
 
-F3 Nation owns the vault infrastructure and manages top-level access via Organization settings and emergency keys:
+In F3, leadership rotates constantly. Technology like domains, email, social accounts, and Slack primary owner logins often get passed around over text, personal email, or sticky notes. That causes problems:
 
-* **Regional Collections:** F3 Nation provisions a dedicated **Collection** for your Region.
-* **Guaranteed Access:** Personal vault storage is disabled system-wide. Every password created in this vault **must** be assigned to a Collection. This ensures that even if a pax rolls off unexpectedly or leaves without sharing credentials, the Region maintains uninterrupted access to regional assets.
-* **Easy Leadership Handoffs:** When a man steps up in your region, a Regional Admin simply gives his account access to the collection by adding the `password manager` role in F3 Nation Admin interface. When he rolls off, the Regional Admin removes that role from account to prevent further access to the regions credentials.
+* **Lost access:** A pax rolls off or goes dark, and the region can't get in.
+* **Security risk:** Passwords sent over Slack or SMS can be stolen.
+* **Painful handoffs:** New pax waste weeks hunting down logins.
 
----
-
-## Zero-Knowledge Security Model
-
-Our vault uses **zero-knowledge encryption**:
-
-1. **Client-Side Encryption:** Your credentials are encrypted locally on your device before they ever hit the server.
-2. **Privacy & Security:** Data is encrypted in transit and at rest, protecting our regional credentials from external leaks or breaches.
+With a central vault, the Nation handles the server, backups, and security. Each region gets a secure space that belongs to the region, not to one guy's inbox.
 
 ---
 
-## Critical Rules & Your Responsibilities
+## How It Works
 
-While Nation secures the infrastructure and guarantees data retention, local security depends on your individual habits:
-
-### 1. Use a Secure Master Password
-
-If somebody can guess your master password they will get access to all of your regions credentials.
-
-### 2. Write Down Your Master Password
-
-Because of zero-knowledge encryption, **there is NO "Forgot Password" link.**
-
-* If you forget your Master Password, your account will have to be deleted and recreated. No passwords will be lost.
-* **Action Required:** Write your Master Password down on paper when you set up your account and keep it somewhere safe at home.
-
-### 3. All Items Belong to Collections
-
-Because personal vaults are removed, any new credential you save will automatically prompt you to select your Region's Collection.
-
-
-### 4. Keep Personal & F3 Separate
-
-Do not attempt to store personal banking, personal emails, or private household passwords in this vault. It is strictly dedicated to **F3 operations**.
-
-Please do NOT use mobile apps or browser extensions with this service as they will attempt to add personal credentials to the vault.
+* **Region Collections:** Each region gets its own **Collection** in the vault.
+* **Guaranteed access:** Personal storage is turned off. Every password must go in a Collection, so the region keeps access even if a pax leaves suddenly.
+* **Easy handoffs:** A Regional Admin grants access by adding the `password_manager` or `password_reader` role in the F3 Nation Admin interface, and removes it when a pax rolls off.
 
 ---
 
-## Onboarding Steps for Regional Pax
+## Security
 
-1. **Receive Invite:** Look for an official email invitation sent by F3 Nation.
-1. **Create Account:** Click the link, set up your account, and create a strong Master Password (write it down!).
-1. **Get Access:** An admin will confirm your account and grant you access to your region's Collections.
+Your credentials are encrypted on your device before they reach the server, and stay encrypted in transit and at rest. This is called **zero-knowledge encryption**.
 
-*Aye!* Thank you for stepping up to lead and keeping our regional tech secure.
+---
+
+## Your Responsibilities
+
+### 1. Use a strong master password
+
+If someone guesses your master password, they can see all your region's credentials.
+
+### 2. Write it down
+
+There is **no "Forgot Password" link.**
+
+* If you forget it, your account must be deleted and recreated.
+* No stored passwords are lost when an individual account is deleted.
+* Keep your master password somewhere safe.
+
+### 3. Everything goes in a Collection
+
+When you save a credential, you'll be prompted to pick your region's Collection.
+
+### 4. Keep personal out
+
+Only store **F3 accounts** here, never personal banking, email, or household passwords.
+
+### 5. Be careful with extensions and mobile apps
+
+For accessing region passwords, we prefer you log into [passwords.f3nation.com](https://passwords.f3nation.com) in your browser. Because this is built around Bitwarden, you can use the Bitwarden mobile app or browser extension to log into the F3 password vault. But when you do this, your phone and your browser will likely prompt you to save credentials for non-F3 logins in the F3 fault and thereby exposing your accounts. This cross contamination is less likely to happen if you just log into the website to retrieve passwords.
+
+---
+
+Thanks for stepping up and keeping our regional tech secure
