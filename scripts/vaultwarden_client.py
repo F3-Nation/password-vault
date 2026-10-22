@@ -57,9 +57,7 @@ class VaultwardenClient:
         payload_json = json.dumps(template)
         encoded_data = self._run_cmd(["bw", "encode"], input_data=payload_json)
 
-        response_json = self._run_cmd(
-            ["bw", "create", "org-collection", encoded_data, "--organizationid", self.org_id]
-        )
+        response_json = self._run_cmd(["bw", "create", "org-collection", encoded_data, "--organizationid", self.org_id])
 
         data = json.loads(response_json)
         logger.info(

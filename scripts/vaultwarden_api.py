@@ -109,9 +109,7 @@ class VaultwardenApiClient:
         _raise_for_status(resp)
         return resp.json()["data"]
 
-    def invite_member(
-        self, email: str, collections: list, member_type: int = MEMBER_TYPE_USER
-    ) -> None:
+    def invite_member(self, email: str, collections: list, member_type: int = MEMBER_TYPE_USER) -> None:
         """Invites a new member to the organization with the given collection access."""
         resp = self.session.post(
             f"{self.vw_url}/api/organizations/{self.org_id}/users/invite",
@@ -126,9 +124,7 @@ class VaultwardenApiClient:
         )
         _raise_for_status(resp)
 
-    def set_member_collections(
-        self, member_id: str, member_type: int, groups: list, collections: list
-    ) -> None:
+    def set_member_collections(self, member_id: str, member_type: int, groups: list, collections: list) -> None:
         """Replaces an existing member's collection grants (and preserves group/type)."""
         resp = self.session.put(
             f"{self.vw_url}/api/organizations/{self.org_id}/users/{member_id}",

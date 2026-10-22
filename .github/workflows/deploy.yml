@@ -1,0 +1,170 @@
+name: Deploy Cloud Run Job
+
+# Tag-triggered deploy (release-please creates the tag): build the image once,
+# push it to Artifact Registry, then `tofu apply` the job with the immutable
+# digest so Cloud Run always runs exactly what this release built.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# Serialize deploys: two releases dispatched close together must not race on
+# the same job (GitHub keeps one pending run per group; the newer one wins).
+concurrency:
+  group: deploy-password-vault-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PROJECT_ID: f3-passwords
+  REGION: us-central1
+  AR_REPO: password-vault-sync
+  IMAGE_NAME: password-vault-sync
+
+jobs:
+  ci-gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: read
+    steps:
+      - name: Validate the pushed ref is an existing release tag
+        env:
+          REF: ${{ github.ref_name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ "${REF}" != v* ]]; then
+            echo "::error::ref '${REF}' is not a v* release tag"
+            exit 1
+          fi
+          if ! gh api "repos/${{ github.repository }}/git/refs/tags/${REF}" >/dev/null 2>&1; then
+            echo "::error::ref '${REF}' is not an existing release tag"
+            exit 1
+          fi
+
+      - name: Wait for CI to pass
+        uses: lewagon/wait-on-check-action@369769072fe522a3a8a85c03c96af1e5242a1994 # v1.9.1
+        with:
+          ref: ${{ github.sha }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          check-regexp: "^(lint|format-check|test)$"
+          wait-interval: 15
+          allowed-conclusions: success
+
+  build:
+    needs: ci-gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+      version: ${{ steps.meta.outputs.version }}
+      digest: ${{ steps.digest.outputs.digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Authenticate to GCP
+        id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SA }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+
+      - name: Authorize Docker to Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Extract tag version
+        id: meta
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${IMAGE_NAME}:${VERSION}"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        run: |
+          # Cloud Run only runs linux/amd64; the Dockerfile FROM lines do not
+          # pin --platform (BuildKit lint), so the target arch is set here.
+          docker build \
+            --platform=linux/amd64 \
+            --file Dockerfile \
+            --tag "${{ steps.meta.outputs.image }}" \
+            .
+          docker push "${{ steps.meta.outputs.image }}"
+
+      - name: Resolve immutable image digest
+        id: digest
+        env:
+          IMAGE: ${{ steps.meta.outputs.image }}
+          TAG: ${{ steps.meta.outputs.version }}
+        run: |
+          IMAGE_PATH="${IMAGE%:*}"
+          DIGESTS="$(gcloud artifacts docker images list "${IMAGE_PATH}" \
+            --project "${PROJECT_ID}" \
+            --include-tags \
+            --format=json \
+            | jq -r --arg tag "${TAG}" '[.[] | select(any(.tags[]?; . == $tag)) | .version] | unique[]')"
+
+          if [[ -z "${DIGESTS}" ]]; then
+            echo "No image found for exact tag ${TAG}" >&2
+            exit 1
+          fi
+
+          mapfile -t DIGESTS <<< "${DIGESTS}"
+          if [[ "${#DIGESTS[@]}" -ne 1 ]] || [[ ! "${DIGESTS[0]}" =~ ^sha256: ]]; then
+            echo "Expected one valid digest for tag ${TAG}, got ${#DIGESTS[@]}" >&2
+            exit 1
+          fi
+
+          echo "digest=${DIGESTS[0]}" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: [build, ci-gate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Authenticate to GCP
+        id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SA }}
+
+      - uses: opentofu/setup-opentofu@9d84900f3238fab8cd84ce47d658d25dd008be2f # v1
+        with:
+          tofu_version: "1.13.2"
+
+      - name: Check state bucket configuration
+        env:
+          TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+        run: |
+          if [[ -z "${TF_STATE_BUCKET}" ]]; then
+            echo "::error::Set the TF_STATE_BUCKET repository variable (GCS bucket for infra/ state)"
+            exit 1
+          fi
+
+      - name: tofu init
+        env:
+          TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+        run: tofu -chdir=infra init -backend-config="bucket=${TF_STATE_BUCKET}"
+
+      - name: tofu apply (job image -> this release's digest)
+        env:
+          GOOGLE_CREDENTIALS: ${{ steps.auth.outputs.credentials_json }}
+          IMAGE: ${{ needs.build.outputs.image }}@${{ needs.build.outputs.digest }}
+        run: tofu -chdir=infra apply -auto-approve -var="image=${IMAGE}"

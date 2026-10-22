@@ -1,4 +1,144 @@
-# Vaultwarden on GCP Cloud Run Setup Guide
+# Password Vault Sync (F3 Nation API → Vaultwarden)
+
+Syncs a self-hosted [Vaultwarden](https://github.com/dani-garcia/vaultwarden)
+instance from the [F3 Nation API](https://api.f3nation.com/docs) as a **single
+parameterized GCP Cloud Run Job**:
+
+| Task | Triggered by | What it does |
+| --- | --- | --- |
+| `--task orgs` | Cloud Scheduler, daily 06:00 America/Chicago | F3 region orgs with `meta.password_vault_enabled === true` become collections (created if missing, renamed when the org is renamed). Orgs that turn the flag off keep their collection but lose every user grant on it. |
+| `--task users` | Cloud Scheduler, hourly | `password_manager` → read/write, `password_reader` → read-only (both → read/write) on the collection for that role's org. Users without access stay org members with **zero** collection grants. Owners/admins (`accessAll`) and revoked members are never touched. |
+| `--task all` | manual runs / job default | `orgs` first, then `users`. |
+
+Both tasks only ever *reconcile*: they never delete collections, never touch
+`accessAll`, and never re-grant access to an org whose vault is disabled.
+
+Collection **names** are encrypted client-side with the organization key
+(Bitwarden format `2.<iv>|<data>|<mac>`, AES-256-CBC + HMAC-SHA256), so the
+job needs that key — extracted **once**, locally, with your master password
+(`scripts/extract_org_key.py`), and stored in Secret Manager. The master
+password itself never runs in the cloud and is never stored.
+
+## Repository layout
+
+| Path | Purpose |
+| --- | --- |
+| `src/password_vault_sync/` | The job: crypto, F3 + Vaultwarden clients, both sync tasks, CLI |
+| `tests/` | Pytest suite (crypto vectors, pagination, both sync rule sets, CLI) |
+| `scripts/extract_org_key.py` | One-time local org-key extraction + verification |
+| `scripts/push-secrets.sh` | Pushes the four Secret Manager values |
+| `infra/` | OpenTofu: Artifact Registry, Cloud Run job, 2 schedulers, SAs, secrets |
+| `.github/workflows/` | `ci.yml`, `release-please.yml`, `release-please-uv-lock.yml`, `deploy.yml` |
+| `Dockerfile` | Slim Python 3.13 + uv image, non-root, `ENTRYPOINT python -m password_vault_sync` |
+| `README.md` (Part 2) | The original guide to hosting Vaultwarden itself on Cloud Run |
+
+## Local development
+
+```bash
+uv sync --locked          # install deps (Python from .python-version)
+uv run ruff check .       # lint
+uv run ruff format .      # format
+uv run pytest             # 104 tests, no network needed
+
+# Run against the live instance using ./.env (dry-run writes nothing):
+uv run python -m password_vault_sync --task users --dry-run --verbose
+uv run python -m password_vault_sync --task orgs --dry-run
+```
+
+## Configuration
+
+Environment variables (in Cloud Run they are bound from Secret Manager by
+`infra/main.tf`; locally they live in `.env`, see `.env.example`):
+
+| Variable | Secret? | Notes |
+| --- | --- | --- |
+| `F3_API_KEY` | yes | From <https://admin.f3nation.com/api-keys>. Sent as `Authorization: Bearer <key>` **plus** a `Client: <identifier>` header — a bare token without `Client` is rejected with 401. |
+| `F3_API_URL` | no | Defaults to `https://api.f3nation.com` |
+| `F3_API_CLIENT` | no | The `Client` header value, defaults to `password-vault-sync` |
+| `VAULTWARDEN_URL` | no | e.g. `https://passwords.f3nation.com` |
+| `VAULTWARDEN_ORG_ID` | no | The organization whose collections are managed |
+| `VAULTWARDEN_CLIENT_ID` | yes | Vaultwarden **user API key** (`Profile → Account Settings → Security → Keys → View API key`), used with `client_credentials` so the job runs unattended |
+| `VAULTWARDEN_CLIENT_SECRET` | yes | Same dialog as the client id |
+| `VAULTWARDEN_ORG_KEY` | yes | base64 32-byte org key; **required by `orgs`, ignored by `users`** |
+
+## One-time setup (GCP + GitHub)
+
+Prerequisites: `gcloud` authenticated for project `f3-passwords`, and
+OpenTofu ≥ 1.8 (`/tmp/opencode/bin/tofu` locally, or any `tofu`/`terraform`).
+
+1. **Repository variables** (Settings → Secrets and variables → Variables):
+   `WIF_PROVIDER`, `WIF_SA` (the workload-identity pair the F3 org already
+   uses for Cloud Run deploys) and `TF_STATE_BUCKET` (the existing GCS bucket
+   for `infra/` state).
+2. **Repository secrets**: `RELEASE_PLEASE_APP_ID`,
+   `RELEASE_PLEASE_APP_PRIVATE_KEY` (the GitHub App that tags releases, so its
+   tag push can trigger `deploy.yml`).
+3. **F3 API key**: create one at <https://admin.f3nation.com/api-keys> and put
+   it in `.env` as `F3_API_KEY` (push-secrets.sh picks it up from there).
+4. **Extract the org key** (needs your Vaultwarden master password once,
+   locally; verifies the key by decrypting existing collection names and
+   cross-checking them against the F3 API):
+
+   ```bash
+   uv run python scripts/extract_org_key.py --email you@f3nation.com
+   # add --apply-secret to also run the gcloud command it prints
+   ```
+
+5. **Bootstrap the infrastructure** (order matters: the job resource needs an
+   existing image *and* secret versions):
+
+   ```bash
+   cd infra
+   tofu init -backend-config="bucket=YOUR_TF_STATE_BUCKET"
+   tofu apply -target=google_artifact_registry_repository.images \
+             -target=google_secret_manager_secret.secrets \
+             -target=google_service_account.runtime \
+             -target=google_service_account.scheduler
+   cd ..
+
+   # push the four secret values (VAULTWARDEN_ORG_KEY from step 4)
+   ./scripts/push-secrets.sh
+
+   # push a first image so the job can be created
+   docker build --platform=linux/amd64 -t us-central1-docker.pkg.dev/f3-passwords/password-vault-sync/password-vault-sync:latest .
+   docker push us-central1-docker.pkg.dev/f3-passwords/password-vault-sync/password-vault-sync:latest
+
+   cd infra && tofu apply && cd ..
+   ```
+
+6. **Smoke test**:
+
+   ```bash
+   gcloud run jobs execute password-vault-sync --region us-central1 --project f3-passwords
+   # job default args are --task all; watch it:
+   gcloud logging read 'resource.type="cloud_run_job" AND textPayload:"summary"' \
+     --project f3-passwords --limit=5 --format='value(textPayload)'
+   ```
+
+## Releases & deploys
+
+Conventional commits on `main` → **release-please** opens/updates a release PR
+(`release-please-config.json`, plain `v*` tags). Merging it creates the tag,
+which triggers **`deploy.yml`**: wait for CI → build & push the image tagged
+with the release version → resolve its digest → `tofu apply -var image=…@sha256:…`
+so the Cloud Run job always runs exactly what that release built.
+
+Schedules, region, and limits live in `infra/variables.tf`
+(`org_sync_schedule`, `user_sync_schedule`, `time_zone`, `task_timeout`).
+
+### Troubleshooting
+
+* `gcloud run jobs executions describe <id> --region us-central1` for exit status; logs via
+  `gcloud logging read 'resource.type="cloud_run_job"'`.
+* `401 … ensure the 'client' header is set` → `F3_API_KEY`/`F3_API_CLIENT` problem.
+* `MAC verification failed` or garbage collection names → wrong/stale
+  `VAULTWARDEN_ORG_KEY`; re-run `scripts/extract_org_key.py` and push again.
+* Task exited `2` → missing environment variable (message names it); exit `1`
+  → a per-org/per-member failure was counted (details in the logs).
+
+---
+
+# Part 2: Vaultwarden on GCP Cloud Run Setup Guide
 
 This guide walks through deploying a production-ready, low-maintenance [Vaultwarden](https://github.com/dani-garcia/vaultwarden) instance using Google Cloud Run and Google Cloud Storage (GCS).
 

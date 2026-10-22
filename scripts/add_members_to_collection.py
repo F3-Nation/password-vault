@@ -45,9 +45,7 @@ def read_members_csv(csv_path: str, default_read_only: bool) -> dict[str, bool]:
 
         field_map = {(name or "").strip().lower(): name for name in reader.fieldnames}
         if "email" not in field_map:
-            raise ValueError(
-                f"CSV '{csv_path}' must have an 'email' column. Found: {reader.fieldnames}."
-            )
+            raise ValueError(f"CSV '{csv_path}' must have an 'email' column. Found: {reader.fieldnames}.")
         email_field = field_map["email"]
         permission_field = field_map.get("permission")
 
@@ -87,23 +85,21 @@ def resolve_collection_id(
     resolved to the collection UUID. Raises a clear error listing the available
     collections if the identifier does not match.
     """
-    if (uuid is None) == (external_id is None):
+    if uuid is not None and external_id is not None:
+        raise ValueError("Provide exactly one of 'uuid' or 'external_id', not both.")
+    if uuid is None and external_id is None:
         raise ValueError("Provide exactly one of 'uuid' or 'external_id'.")
 
     collections = client.list_collections()
-    available = (
-        ", ".join(f"{c.get('id')} (externalId={c.get('externalId')})" for c in collections)
-        or "<none>"
-    )
+    available = ", ".join(f"{c.get('id')} (externalId={c.get('externalId')})" for c in collections) or "<none>"
 
     if uuid is not None:
         uuid = uuid.strip()
         if any(str(c.get("id")) == uuid for c in collections):
             return uuid
-        raise ValueError(
-            f"No collection found with UUID '{uuid}'. Available collections: {available}"
-        )
+        raise ValueError(f"No collection found with UUID '{uuid}'. Available collections: {available}")
 
+    assert external_id is not None  # guaranteed by the mutually-exclusive check above
     external_id = external_id.strip()
     external_matches = [c for c in collections if str(c.get("externalId")) == external_id]
     if len(external_matches) == 1:
@@ -116,9 +112,7 @@ def resolve_collection_id(
             f"Ambiguous externalId '{external_id}': multiple collections share it ({ids}). "
             f"Pass the collection UUID with --collection-uuid instead."
         )
-    raise ValueError(
-        f"No collection found with externalId '{external_id}'. Available collections: {available}"
-    )
+    raise ValueError(f"No collection found with externalId '{external_id}'. Available collections: {available}")
 
 
 def _permission_label(read_only: bool) -> str:
@@ -158,9 +152,7 @@ def apply_members(
                 continue
 
             if member.get("accessAll"):
-                logger.info(
-                    "SKIP '%s': member has access to all collections; not modifying.", email
-                )
+                logger.info("SKIP '%s': member has access to all collections; not modifying.", email)
                 continue
 
             if member.get("status", STATUS_INVITED) == STATUS_REVOKED:
@@ -172,9 +164,7 @@ def apply_members(
 
             if existing is None:
                 collections.append(_collection_entry(collection_id, read_only))
-                client.set_member_collections(
-                    member["id"], member["type"], list(member.get("groups", [])), collections
-                )
+                client.set_member_collections(member["id"], member["type"], list(member.get("groups", [])), collections)
                 logger.info(
                     "ADDED '%s' to collection %s (%s)",
                     email,
@@ -183,9 +173,7 @@ def apply_members(
                 )
             elif bool(existing.get("readOnly")) != read_only:
                 existing["readOnly"] = read_only
-                client.set_member_collections(
-                    member["id"], member["type"], list(member.get("groups", [])), collections
-                )
+                client.set_member_collections(member["id"], member["type"], list(member.get("groups", [])), collections)
                 logger.info(
                     "UPDATED '%s' permission on collection %s -> %s",
                     email,
@@ -242,9 +230,7 @@ def main():
     )
     parser.add_argument("--org-id", default=os.getenv("VAULTWARDEN_ORG_ID"), help="Organization ID")
     parser.add_argument("--vw-url", default=os.getenv("VAULTWARDEN_URL"), help="Vaultwarden base URL")
-    parser.add_argument(
-        "--client-id", default=os.getenv("VAULTWARDEN_CLIENT_ID"), help="API key client id"
-    )
+    parser.add_argument("--client-id", default=os.getenv("VAULTWARDEN_CLIENT_ID"), help="API key client id")
     parser.add_argument(
         "--client-secret",
         default=os.getenv("VAULTWARDEN_CLIENT_SECRET"),

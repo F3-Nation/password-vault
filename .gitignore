@@ -7,6 +7,19 @@
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# OpenTofu local state/working files (the provider lock file IS committed)
+infra/.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+*.tfvars.json
+*.tfbackend
 
 # Virtual Environments
 .venv/

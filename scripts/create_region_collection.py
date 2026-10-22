@@ -3,11 +3,13 @@ import argparse
 import logging
 import os
 import sys
+
 from dotenv import load_dotenv
 from vaultwarden_client import VaultwardenClient
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
 
 def main():
     parser = argparse.ArgumentParser(description="Create a Vaultwarden Region Collection.")
@@ -22,6 +24,7 @@ def main():
         client.create_collection(args.region_name, args.postgres_id)
     except Exception:
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
