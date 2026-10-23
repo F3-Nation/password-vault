@@ -27,8 +27,9 @@ password itself never runs in the cloud and is never stored.
 | `tests/` | Pytest suite (crypto vectors, pagination, both sync rule sets, CLI) |
 | `scripts/extract_org_key.py` | One-time local org-key extraction + verification |
 | `scripts/push-secrets.sh` | Pushes the four Secret Manager values |
+| `scripts/check_commit_msg.py` | Conventional-commit rules (shared by the pre-commit hook and CI) |
 | `infra/` | OpenTofu: Artifact Registry, Cloud Run job, 2 schedulers, SAs, secrets |
-| `.github/workflows/` | `ci.yml`, `release-please.yml`, `release-please-uv-lock.yml`, `deploy.yml` |
+| `.github/workflows/` | `ci.yml`, `commitlint.yml`, `release-please.yml`, `release-please-uv-lock.yml`, `deploy.yml` |
 | `Dockerfile` | Slim Python 3.13 + uv image, non-root, `ENTRYPOINT python -m password_vault_sync` |
 | `README.md` (Part 2) | The original guide to hosting Vaultwarden itself on Cloud Run |
 
@@ -38,7 +39,10 @@ password itself never runs in the cloud and is never stored.
 uv sync --locked          # install deps (Python from .python-version)
 uv run ruff check .       # lint
 uv run ruff format .      # format
-uv run pytest             # 104 tests, no network needed
+uv run pytest             # full suite, no network needed
+
+# Enforce Conventional Commits at commit time (once per clone):
+uv run pre-commit install --hook-type commit-msg
 
 # Run against the live instance using ./.env (dry-run writes nothing):
 uv run python -m password_vault_sync --task users --dry-run --verbose
@@ -116,6 +120,16 @@ OpenTofu ≥ 1.8 (`/tmp/opencode/bin/tofu` locally, or any `tofu`/`terraform`).
    ```
 
 ## Releases & deploys
+
+Commit messages must be **Conventional Commits** — `type(scope): subject` with
+scopes from `main, sync, infra, ci, scripts, docs, deps, repo, release`
+(e.g. `fix(sync): stop re-putting invited member grants`). release-please
+bumps versions from those types (`feat` → minor, `fix` → patch), so a
+non-conventional message never produces a release. The rules live in
+`scripts/check_commit_msg.py` and run in three places: a pre-commit
+`commit-msg` hook (`uv run pre-commit install --hook-type commit-msg`), and
+CI on the PR title and commit subjects (`commitlint.yml`, with release-please's
+own bot PRs exempt).
 
 Conventional commits on `main` → **release-please** opens/updates a release PR
 (`release-please-config.json`, plain `v*` tags). Merging it creates the tag,

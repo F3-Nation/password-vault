@@ -1,0 +1,46 @@
+name: Commitlint
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  # Squash-merge builds the squash commit subject from the PR title, and
+  # release-please parses that subject to decide version bumps. The local
+  # commit-msg hook never sees the PR title, so validate it here against the
+  # same rules as scripts/check_commit_msg.py (single source of truth).
+  #
+  # Exempt release-please's own bot PRs: their titles (e.g. "chore: release
+  # main") intentionally omit a scope and are committed via the API. Gate the
+  # STEP (not the job) so a skipped run still reports green and never blocks
+  # branch protection on the bot's release PRs — same pattern as f3-nation.
+  pr-title:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Lint PR title with commitlint rules
+        if: ${{ !startsWith(github.head_ref, 'release-please--') }}
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: printf '%s\n' "$PR_TITLE" | python3 scripts/check_commit_msg.py
+
+  # The local hook only sees what a developer commits locally; check every
+  # commit in the PR too (squash is allowed but rebase-merge keeps subjects).
+  # Release-please bot PRs are likewise exempt at the step level.
+  commits:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Lint commit subjects in this PR
+        if: ${{ !startsWith(github.head_ref, 'release-please--') }}
+        run: >-
+          python3 scripts/check_commit_msg.py --range
+          "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"

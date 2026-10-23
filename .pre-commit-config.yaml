@@ -1,0 +1,13 @@
+# Conventional-commits enforcement, mirroring f3-nation's commitlint + lefthook
+# commit-msg hook with a Python-native stack (rule source shared with CI):
+# scripts/check_commit_msg.py.
+#
+# One-time setup per clone:  uv run pre-commit install --hook-type commit-msg
+repos:
+  - repo: local
+    hooks:
+      - id: conventional-commit
+        name: conventional commit message
+        entry: python3 scripts/check_commit_msg.py
+        language: system
+        stages: [commit-msg]
