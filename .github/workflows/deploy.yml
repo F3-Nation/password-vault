@@ -167,4 +167,10 @@ jobs:
         env:
           GOOGLE_CREDENTIALS: ${{ steps.auth.outputs.credentials_json }}
           IMAGE: ${{ needs.build.outputs.image }}@${{ needs.build.outputs.digest }}
-        run: tofu -chdir=infra apply -auto-approve -var="image=${IMAGE}"
+          TF_VAR_vaultwarden_org_id: ${{ vars.VAULTWARDEN_ORG_ID }}
+        run: |
+          if [[ -z "${TF_VAR_vaultwarden_org_id}" ]]; then
+            echo "::error::Set the VAULTWARDEN_ORG_ID repository variable (the org whose collections are synced)"
+            exit 1
+          fi
+          tofu -chdir=infra apply -auto-approve -var="image=${IMAGE}"
