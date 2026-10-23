@@ -1,6 +1,6 @@
 [project]
 name = "password-vault-sync"
-version = "1.1.0"
+version = "1.1.1"
 description = "Syncs F3 Nation API orgs/users with a Vaultwarden instance as a GCP Cloud Run Job"
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
