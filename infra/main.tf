@@ -68,7 +68,11 @@ resource "google_project_iam_custom_role" "run_job_runner" {
   role_id     = "passwordVaultSyncJobRunner"
   title       = "Password Vault Sync Job Runner"
   description = "Allows starting executions of the password-vault-sync Cloud Run job"
-  permissions = ["run.jobs.run"]
+  # run.jobs.run         -> jobs:run with the job's default args (e.g. manual --task all)
+  # run.jobs.runWithOverrides -> jobs:run carrying containerOverrides, which is how the
+  #   Cloud Scheduler swaps in --task orgs / --task users per execution. Without this
+  #   second permission every scheduler attempt is rejected with 403 PERMISSION_DENIED.
+  permissions = ["run.jobs.run", "run.jobs.runWithOverrides"]
 }
 
 resource "google_project_iam_member" "scheduler_runs_job" {
