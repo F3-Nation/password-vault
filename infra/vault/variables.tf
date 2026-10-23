@@ -26,7 +26,7 @@ variable "image" {
     rate limits and serves byte-identical digests to docker.io.
   EOT
   type        = string
-  default     = "mirror.gcr.io/vaultwarden/server:1.37.3@sha256:4ecafc9049c7d878c7717d1ce4f9059d706758c78b8fa42e5ead21f4b2dfc770"
+  default     = "mirror.gcr.io/vaultwarden/server:1.37.4@sha256:efb3cde962015fcc036b2ea625242248611943b27212ebf4392841fb30fad055"
 }
 
 variable "data_bucket" {
