@@ -7,4 +7,4 @@ One Cloud Run Job, three modes (``--task orgs|users|all``):
 * ``all``   — run orgs first, then users.
 """
 
-__version__ = "1.1.1"
+__version__ = "1.1.2"
