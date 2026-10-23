@@ -11,6 +11,7 @@
   "rangeStrategy": "bump",
   "pinDigests": true,
   "prConcurrentLimit": 10,
+  "prHourlyLimit": 0,
   "semanticCommits": "enabled",
   "vulnerabilityAlerts": { "groupName": null, "schedule": [] },
   "customManagers": [
