@@ -11,7 +11,8 @@ conventional commit  ──►  release-please opens/updates a release PR
         │                          │
         │                 you merge the release PR
         │                          │
-        │                 tag v* is created ──► deploy.yml
+        │            jobs@<x.y.z> tag is created ──► deploy.yml
+        │            vault@<x.y.z> tag is created ──► deploy-vault.yml
         │                                         │
         │                     ┌───────────────────┴───────────────────┐
         │                     │ ci-gate: wait for lint/format/test    │
@@ -37,20 +38,33 @@ docs, deps, repo, release`).
 - `feat` → minor bump, `fix` → patch, `feat!:`/breaking → major.
 - `chore`, `docs`, `ci`, `style`, `test`, `build`, `refactor` are hidden in
   `release-please-config.json`: they land without cutting a release.
-- `.release-please-manifest.json` holds the current version (`1.0.0`).
+
+This repo is a **two-component manifest** (release-please monorepo mode):
+
+| Component | Path | Tag | Versions |
+| --- | --- | --- | --- |
+| `jobs` | `.` (excludes `infra/vault`) | `jobs@X.Y.Z` | the sync job (version in `pyproject.toml`) |
+| `vault` | `infra/vault` | `vault@X.Y.Z` | the Vaultwarden service |
+
+`.release-please-manifest.json` holds both current versions. Commits are routed
+to a component by **path**: anything under `infra/vault/**` bumps `vault`, and
+the `jobs` package sets `exclude-paths: ["infra/vault"]` so a vault image bump
+never bumps the sync job. `include-component-in-tag: true` +
+`tag-separator: "@"` + `include-v-in-tag: false` produce the `jobs@`/`vault@`
+tags.
 
 On each push to `main`, `.github/workflows/release-please.yml` mints a
 GitHub App token (org secrets `RELEASE_PLEASE_APP_ID` +
 `RELEASE_PLEASE_APP_PRIVATE_KEY`, App installed on this repo) and runs
 release-please. If there are releasable commits it opens/updates a **release
 PR** (version bump + `CHANGELOG.md` entries). Merging that PR creates the
-`v*` tag **with the App token** — that matters: a tag pushed with the
-default `GITHUB_TOKEN` would *not* trigger `deploy.yml`, so the App is what
-closes the loop.
+`jobs@`/`vault@` tag(s) **with the App token** — that matters: a tag pushed
+with the default `GITHUB_TOKEN` would *not* trigger the deploy workflows, so
+the App is what closes the loop.
 
 ## 2. Deploy (`.github/workflows/deploy.yml`)
 
-Triggered by any pushed `v*` tag; deploys are serialized
+Triggered by any pushed `jobs@*` tag; deploys are serialized
 (`concurrency: deploy-password-vault-sync`, no cancellation, so two releases
 close together queue instead of racing on the same job).
 
@@ -66,7 +80,34 @@ reproducible and auditable (`gcloud artifacts docker images list …` shows
 which tag produced which digest). The `:latest` fallback in
 `infra/variables.tf` exists only for the one-time bootstrap.
 
-The tag `vX.Y.Z` becomes the image tag `X.Y.Z` (the `v` is stripped).
+The tag `jobs@X.Y.Z` becomes the image tag `X.Y.Z` (the `jobs@` prefix is
+stripped).
+
+## 2b. Deploy Vaultwarden (`.github/workflows/deploy-vault.yml`)
+
+Triggered by any pushed `vault@*` tag (serialized as `deploy-vaultwarden`).
+There is nothing to build here — the Vaultwarden image digest is committed in
+`infra/vault/` (maintained by Renovate), so the job just applies that terraform
+root:
+
+| Job | What it does |
+| --- | --- |
+| `ci-gate` | Verifies the ref is a `vault@*` release tag, then waits for `lint`, `format-check`, `test` on the same SHA. |
+| `deploy` | WIF auth, `tofu -chdir=infra/vault init` against the same GCS bucket (state key `infra-vault/default.tfstate`), then `tofu apply` — moves the service to the image digest pinned at that release. |
+
+Because it is a **separate terraform root with its own state**, a vault image
+bump never touches `password-vault-sync` and vice versa. The service runs
+`vaultwarden/server` from `mirror.gcr.io`, digest-pinned, autoscaling 0→1
+(SQLite on GCS FUSE allows a single writer, so `maxScale` is 1).
+
+**Renovate** (`renovate.json`) keeps the Vaultwarden image current: a regex
+custom manager extracts the digest from `infra/vault/variables.tf`, the docker
+datasource checks upstream `vaultwarden/server`, and an update is opened as a
+`fix(infra):` PR (own group, never auto-merged). Merging it → release-please
+bumps the `vault` component → `vault@` tag → `deploy-vault.yml` applies it.
+Renovate also covers GitHub Actions, the Dockerfile base image, and Python
+(uv) deps — those commit as `chore(deps)` (hidden, so they ride along with the
+next `jobs`/`vault` release rather than forcing one).
 
 ## 3. Running (Cloud Scheduler)
 
@@ -125,17 +166,28 @@ no long-lived keys in this repo or its CI.
 
 ## 5. Infrastructure changes
 
-`infra/` is OpenTofu; state lives in versioned GCS (only
-`.terraform.lock.hcl` is committed, never `.terraform/`).
+There are **two OpenTofu roots**, each with its own state key in the same
+versioned GCS bucket (only `.terraform.lock.hcl` is committed, never
+`.terraform/`):
 
-- **Deployed automatically** on the next release: any `infra/*.tf` diff rides
-  along with the tag deploy's `tofu apply`.
+| Root | State key | Deploys via |
+| --- | --- | --- |
+| `infra/` (sync job) | `default.tfstate` | `jobs@*` tag → `deploy.yml` |
+| `infra/vault/` (Vaultwarden) | `infra-vault/default.tfstate` | `vault@*` tag → `deploy-vault.yml` |
+
+- **Deployed automatically** on the matching release: any `infra/*.tf` diff
+  rides along with the `jobs@` tag deploy's `tofu apply`; `infra/vault/*.tf`
+  with the `vault@` tag deploy.
 - **Deploy now** (infra-only change, no app change): apply locally —
 
   ```bash
-  cd infra
-  tofu init -backend-config="bucket=$TF_STATE_BUCKET"
+  # sync job
+  cd infra && tofu init -backend-config="bucket=$TF_STATE_BUCKET"
   TF_VAR_vaultwarden_org_id=<org-id> tofu apply
+
+  # vault (all values are variables with defaults; no TF_VAR needed)
+  cd infra/vault && tofu init -backend-config="bucket=$TF_STATE_BUCKET"
+  tofu apply
   ```
 
   or cut a release anyway; the apply is a no-op apart from your diff.
@@ -177,6 +229,6 @@ again.
 | --- | --- |
 | Deploy run red | Which job failed: `ci-gate` (CI never passed / not a real tag), `build` (WIF auth, AR permissions), `deploy` (`tofu apply` output — e.g. a disabled GCP API surfaces as `SERVICE_DISABLED`). Re-run with `gh run rerun <id> --failed` after fixing. |
 | No release PR appearing | Check the **Release Please** workflow run: "No user facing commits found" means only hidden types (`chore`/`docs`/`ci`) landed — intended. Failures at `create-github-app-token` mean the App secrets are missing/not visible to this repo. |
-| Release PR exists but no tag after merge | Merging the PR only pushes to `main`; the *next* Release Please run (triggered by that push) creates the tag with the App token. If no `v*` tag appears, inspect that run. A tag created any other way (e.g. a manual `git push origin v*`) also works for deploys but bypasses release-please's bookkeeping. |
+| Release PR exists but no tag after merge | Merging the PR only pushes to `main`; the *next* Release Please run (triggered by that push) creates the tag with the App token. If no `jobs@`/`vault@` tag appears, inspect that run. A tag created any other way (e.g. a manual `git push origin jobs@*`) also works for deploys but bypasses release-please's bookkeeping. |
 | Scheduler fired but no sync happened | `gcloud scheduler jobs list` → confirm RUNNABLE; then find the execution the call created and read its logs — the API call itself returns success immediately. |
 | Sync ran but made wrong changes | Always re-run with `--dry-run` locally first: `uv run python -m password_vault_sync --task users --dry-run --verbose`. |

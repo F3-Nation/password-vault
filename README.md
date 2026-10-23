@@ -156,6 +156,8 @@ Schedules, region, and limits live in `infra/variables.tf`
 
 This guide walks through deploying a production-ready, low-maintenance [Vaultwarden](https://github.com/dani-garcia/vaultwarden) instance using Google Cloud Run and Google Cloud Storage (GCS).
 
+> **The Cloud Run service is now managed by OpenTofu** in [`infra/vault/`](infra/vault/) (see `docs/deployment.md`). Its image is kept current by Renovate and deployed via the `vault@*` release pipeline — so the manual `gcloud run deploy` steps below are **reference/history only**; do not re-run them against the live service (they would drift from terraform). Sections on one-time setup (project APIs, the GCS bucket, the admin token, first-run lockdown) and the Bitwarden CLI still apply as-is.
+
 ---
 
 ## Prerequisites
@@ -281,13 +283,16 @@ gcloud run services update f3-passwords \
 
 ### Updating to the Latest Vaultwarden Version
 
-To pull the newest image patch and deploy it with zero downtime, re-run the deployment command:
+Updates are now automatic: **Renovate** opens a `fix(infra):` PR bumping the
+digest in [`infra/vault/variables.tf`](infra/vault/variables.tf); merging it
+flows through release-please → a `vault@X.Y.Z` tag → `deploy-vault.yml`, which
+applies the change (zero-downtime rolling revision). You can also bump by hand:
 
 ```bash
-gcloud run deploy f3-passwords \
-  --image=docker.io/vaultwarden/server:latest \
-  --region=us-central1
-
+cd infra/vault
+# point var.image at the digest you want, then
+tofu init -backend-config="bucket=$TF_STATE_BUCKET"
+tofu apply
 ```
 
 ### Modifying Configuration Settings
