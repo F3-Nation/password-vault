@@ -160,12 +160,16 @@ Set your active GCP project ID and enable the necessary service APIs.
 # Set your active GCP project
 gcloud config set project f3-passwords
 
-# Enable Cloud Run, Artifact Registry, Storage, and Secret Manager APIs
+# Enable Cloud Run, Artifact Registry, Storage, Secret Manager, Scheduler,
+# and Cloud Resource Manager (project-level IAM bindings created by OpenTofu)
 gcloud services enable \
   run.googleapis.com \
   artifactregistry.googleapis.com \
   storage.googleapis.com \
-  secretmanager.googleapis.com
+  secretmanager.googleapis.com \
+  cloudscheduler.googleapis.com \
+  iam.googleapis.com \
+  cloudresourcemanager.googleapis.com
 
 ```
 
