@@ -7,7 +7,7 @@ name: Deploy Cloud Run Job
 on:
   push:
     tags:
-      - "v*"
+      - "jobs@*"
 
 # Serialize deploys: two releases dispatched close together must not race on
 # the same job (GitHub keeps one pending run per group; the newer one wins).
@@ -36,8 +36,8 @@ jobs:
           REF: ${{ github.ref_name }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [[ "${REF}" != v* ]]; then
-            echo "::error::ref '${REF}' is not a v* release tag"
+          if [[ "${REF}" != jobs@* ]]; then
+            echo "::error::ref '${REF}' is not a jobs@* release tag"
             exit 1
           fi
           if ! gh api "repos/${{ github.repository }}/git/refs/tags/${REF}" >/dev/null 2>&1; then
@@ -85,7 +85,7 @@ jobs:
       - name: Extract tag version
         id: meta
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${GITHUB_REF_NAME#jobs@}"
           IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${IMAGE_NAME}:${VERSION}"
           echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"

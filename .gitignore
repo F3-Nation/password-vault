@@ -14,7 +14,7 @@ dist/
 build/
 
 # OpenTofu local state/working files (the provider lock file IS committed)
-infra/.terraform/
+.terraform/
 *.tfstate
 *.tfstate.backup
 *.tfvars

@@ -1,0 +1,95 @@
+name: Deploy Vaultwarden
+
+# Tag-triggered deploy (release-please creates the vault@<version> tag): apply
+# the vault terraform root. Unlike the sync job there is nothing to build here
+# -- the Vaultwarden image digest is committed in infra/vault/ and maintained by
+# Renovate, so the apply simply moves the service to whatever image that release
+# pins. This runs independently of the sync-job deploys (separate state, separate
+# tag), so a vault image bump never touches password-vault-sync and vice versa.
+
+on:
+  push:
+    tags:
+      - "vault@*"
+
+# Serialize vault deploys (same rationale as deploy.yml: two releases dispatched
+# close together must not race on the same service).
+concurrency:
+  group: deploy-vaultwarden
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ci-gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: read
+    steps:
+      - name: Validate the pushed ref is an existing release tag
+        env:
+          REF: ${{ github.ref_name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ "${REF}" != vault@* ]]; then
+            echo "::error::ref '${REF}' is not a vault@* release tag"
+            exit 1
+          fi
+          if ! gh api "repos/${{ github.repository }}/git/refs/tags/${REF}" >/dev/null 2>&1; then
+            echo "::error::ref '${REF}' is not an existing release tag"
+            exit 1
+          fi
+
+      - name: Wait for CI to pass
+        uses: lewagon/wait-on-check-action@369769072fe522a3a8a85c03c96af1e5242a1994 # v1.9.1
+        with:
+          ref: ${{ github.sha }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          check-regexp: "^(lint|format-check|test)$"
+          wait-interval: 15
+          allowed-conclusions: success
+
+  deploy:
+    needs: ci-gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Authenticate to GCP
+        id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SA }}
+
+      - uses: opentofu/setup-opentofu@9d84900f3238fab8cd84ce47d658d25dd008be2f # v1
+        with:
+          tofu_version: "1.13.2"
+
+      - name: Check state bucket configuration
+        env:
+          TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+        run: |
+          if [[ -z "${TF_STATE_BUCKET}" ]]; then
+            echo "::error::Set the TF_STATE_BUCKET repository variable (GCS bucket for infra/ state)"
+            exit 1
+          fi
+
+      - name: tofu init
+        env:
+          TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+        run: tofu -chdir=infra/vault init -backend-config="bucket=${TF_STATE_BUCKET}"
+
+      # No -var image here: the digest is the terraform default, updated by
+      # Renovate, so this release applies exactly the image it was cut for.
+      - name: tofu apply (vault service -> the image pinned in this release)
+        env:
+          GOOGLE_CREDENTIALS: ${{ steps.auth.outputs.credentials_json }}
+        run: tofu -chdir=infra/vault apply -input=false -auto-approve -no-color

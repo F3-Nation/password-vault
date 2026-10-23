@@ -1,8 +1,10 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
-  "release-type": "python",
-  "include-v-in-tag": true,
-  "include-component-in-tag": false,
+  "include-v-in-tag": false,
+  "include-v-in-release-name": false,
+  "tag-separator": "@",
+  "include-component-in-tag": true,
+  "bootstrap-sha": "07b223f1ba50576d1c24d1b6e34baa8594835066",
   "changelog-sections": [
     { "type": "feat", "section": "Features" },
     { "type": "fix", "section": "Bug Fixes" },
@@ -18,7 +20,15 @@
   ],
   "packages": {
     ".": {
-      "component": "password-vault-sync",
+      "component": "jobs",
+      "release-type": "python",
+      "changelog-path": "CHANGELOG.md",
+      "release-branches": ["main"],
+      "exclude-paths": ["infra/vault"]
+    },
+    "infra/vault": {
+      "component": "vault",
+      "release-type": "simple",
       "changelog-path": "CHANGELOG.md",
       "release-branches": ["main"]
     }
