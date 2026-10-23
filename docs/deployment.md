@@ -101,7 +101,7 @@ bump never touches `password-vault-sync` and vice versa. The service runs
 (SQLite on GCS FUSE allows a single writer, so `maxScale` is 1).
 
 **Renovate** (`renovate.json`) keeps the Vaultwarden image current: a regex
-custom manager extracts the digest from `infra/vault/variables.tf`, the docker
+custom manager extracts tag+digest from `infra/vault/variables.tf`, the docker
 datasource checks upstream `vaultwarden/server`, and an update is opened as a
 `fix(infra):` PR (own group, never auto-merged). Merging it → release-please
 bumps the `vault` component → `vault@` tag → `deploy-vault.yml` applies it.

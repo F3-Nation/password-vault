@@ -18,15 +18,15 @@ variable "service_name" {
 
 variable "image" {
   description = <<-EOT
-    Fully-qualified Vaultwarden image (mirror.gcr.io/vaultwarden/server@sha256:...).
-    Renovate keeps the digest current via a regex custom manager in renovate.json;
+    Fully-qualified Vaultwarden image (mirror.gcr.io/vaultwarden/server:<tag>@sha256:...).
+    Renovate keeps the tag+digest current via a regex custom manager in renovate.json;
     a merged bump flows through release-please -> vault@<version> tag -> deploy-vault.yml,
     which applies this root. Pinning by digest (not a mutable tag) keeps every
     deploy reproducible and auditable. The mirror.gcr.io registry avoids Docker Hub
     rate limits and serves byte-identical digests to docker.io.
   EOT
   type        = string
-  default     = "mirror.gcr.io/vaultwarden/server@sha256:4ecafc9049c7d878c7717d1ce4f9059d706758c78b8fa42e5ead21f4b2dfc770"
+  default     = "mirror.gcr.io/vaultwarden/server:1.37.3@sha256:4ecafc9049c7d878c7717d1ce4f9059d706758c78b8fa42e5ead21f4b2dfc770"
 }
 
 variable "data_bucket" {

@@ -15,11 +15,11 @@
   "vulnerabilityAlerts": { "groupName": null, "schedule": [] },
   "customManagers": [
     {
-      "description": "Vaultwarden image in infra/vault. Renovate's built-in terraform manager only handles Docker/K8s provider resources, not google_cloud_run_v2_service, so this regex extracts the digest and lets the docker datasource track upstream vaultwarden/server (mirror.gcr.io serves byte-identical digests to docker.io).",
+      "description": "Vaultwarden image in infra/vault. Renovate's built-in terraform manager only handles Docker/K8s provider resources, not google_cloud_run_v2_service, so this regex extracts tag+digest and lets the docker datasource track upstream vaultwarden/server (mirror.gcr.io serves byte-identical digests to docker.io).",
       "customType": "regex",
       "managerFilePatterns": ["/(^|/)infra\\/vault\\/.*\\.tf$/"],
       "matchStrings": [
-        "\"mirror\\.gcr\\.io\\/(?<depName>[\\w.-]+\\/[\\w.-]+)@sha256:(?<currentDigest>[a-f0-9]+)\""
+        "\"mirror\\.gcr\\.io\\/(?<depName>[\\w.-]+\\/[\\w.-]+):(?<currentValue>[\\w.+-]+)@sha256:(?<currentDigest>[a-f0-9]{64})\""
       ],
       "datasourceTemplate": "docker",
       "versioningTemplate": "docker"
