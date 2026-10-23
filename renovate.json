@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json.schemastore.org/renovate.json",
+  "extends": ["config:recommended", "group:allNonMajor"],
+  "enabledManagers": ["github-actions", "dockerfile", "pep621", "regex"],
+  "timezone": "America/New_York",
+  "schedule": ["before 9am on Monday"],
+  "dependencyDashboard": true,
+  "dependencyDashboardAutoclose": true,
+  "minimumReleaseAge": "7 days",
+  "labels": ["dependencies"],
+  "rangeStrategy": "bump",
+  "pinDigests": true,
+  "prConcurrentLimit": 10,
+  "semanticCommits": "enabled",
+  "vulnerabilityAlerts": { "groupName": null, "schedule": [] },
+  "customManagers": [
+    {
+      "description": "Vaultwarden image in infra/vault. Renovate's built-in terraform manager only handles Docker/K8s provider resources, not google_cloud_run_v2_service, so this regex extracts the digest and lets the docker datasource track upstream vaultwarden/server (mirror.gcr.io serves byte-identical digests to docker.io).",
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)infra\\/vault\\/.*\\.tf$/"],
+      "matchStrings": [
+        "\"mirror\\.gcr\\.io\\/(?<depName>[\\w.-]+\\/[\\w.-]+)@sha256:(?<currentDigest>[a-f0-9]+)\""
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Group first-party GitHub Actions (actions/*); auto-merge minor and patch — low supply-chain risk",
+      "groupName": "GitHub Actions (first-party)",
+      "matchDatasources": ["github-actions"],
+      "matchPackageNames": ["actions/*"],
+      "automerge": true,
+      "matchUpdateTypes": ["minor", "patch"]
+    },
+    {
+      "description": "Group third-party GitHub Actions; require manual review — these run with deploy secrets",
+      "groupName": "GitHub Actions (third-party)",
+      "matchDatasources": ["github-actions"],
+      "matchPackageNames": ["!actions/*"]
+    },
+    {
+      "description": "Do not automatically upgrade the Python runtime requirement",
+      "matchManagers": ["pep621"],
+      "matchDepTypes": ["requires-python"],
+      "enabled": false
+    },
+    {
+      "description": "Pin Python (uv/pyproject.toml) dependencies to exact versions on every update, instead of a range. Required for minimumReleaseAge to actually work with uv: Renovate can only stop `uv lock` from grabbing a too-new version if the version in pyproject.toml is an exact pin, not a range (see renovatebot/renovate#41624). Must stay its own rule — rangeStrategy can't be combined with matchUpdateTypes in one packageRule, because rangeStrategy is evaluated before Renovate knows the update type.",
+      "matchManagers": ["pep621"],
+      "rangeStrategy": "pin"
+    },
+    {
+      "description": "Group Python (uv/pyproject.toml) minor and patch updates into one PR, separate from the actions group — different lockfile, keeps uv.lock churn reviewable on its own",
+      "groupName": "Python dependencies (non-major)",
+      "groupSlug": "python-non-major",
+      "matchManagers": ["pep621"],
+      "matchUpdateTypes": ["minor", "patch"]
+    },
+    {
+      "description": "Do not auto-update the Python base image; adopt interpreter upgrades manually",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["python"],
+      "enabled": false
+    },
+    {
+      "description": "Vaultwarden image (infra/vault): keep it out of every group and never auto-merge — it is the password manager. Commit as fix(infra) so a bump flows through release-please (path-scoped to the vault component) -> vault@ tag -> deploy-vault.yml.",
+      "matchManagers": ["regex"],
+      "matchPackageNames": ["vaultwarden/server"],
+      "groupName": null,
+      "automerge": false,
+      "semanticCommitType": "fix",
+      "semanticCommitScope": "infra"
+    }
+  ]
+}
