@@ -5,16 +5,16 @@ description = "Syncs F3 Nation API orgs/users with a Vaultwarden instance as a G
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
-    "cryptography>=46.0.5",
-    "python-dotenv>=1.2.1,<2.0.0",
-    "requests>=2.31.0,<3.0.0",
+    "cryptography==50.0.2",
+    "python-dotenv==1.2.4",
+    "requests==2.34.2",
 ]
 
 [dependency-groups]
 dev = [
-    "pre-commit>=4.7.0",
-    "pytest>=9.1.1,<9.2.0",
-    "ruff>=0.14.0,<1.0.0",
+    "pre-commit==4.7.0",
+    "pytest==9.1.1",
+    "ruff==0.17.1",
 ]
 
 [build-system]
